@@ -156,3 +156,28 @@ filter_alignment(){
   
   source deactivate
 }
+
+
+# run_cpat <input_fasta> <output_name> <output_dir>
+# Aim: 
+  # call ORF from fasta file using CPAT (determine whether isoforms are protein-coding or non-protein-coding)
+# Input:
+  # input_fasta = input fasta for ORF to be called from
+  # output_name = prefix output name
+  # output_dir = path of output root directory to create CPAT folder directory
+# Pre-requisite:
+  # ${HEXAMER} = CPAT hexamer file (called from config file)
+  # ${LOGITMODEL} = CPAT logit model (called from config file)
+# Output
+  # CPAT output files
+  # CPAT log file
+
+run_cpat(){
+  
+  cd $3
+  source activate sqanti2_py3
+  cpat.py --version
+  cpat.py -x ${HEXAMER} -d ${LOGITMODEL} -g $1 --min-orf=50 --top-orf=50 -o $2 2> $2"_cpat.e"
+
+  
+}

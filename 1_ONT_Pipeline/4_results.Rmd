@@ -1,0 +1,88 @@
+---
+title: "iPSC ALS model"
+author: "Szi Kay Leung"
+date: "16/10/2023"
+output:
+  html_document:
+    code_folding: hide
+
+---
+
+```{r setup, include=FALSE}
+SC_ROOT = "/gpfs/mrc0/projects/Research_Project-MRC148213/sl693/scripts/iPSC_ABhinge/1_ONT_Pipeline/"
+LOGEN_ROOT = "/gpfs/mrc0/projects/Research_Project-MRC148213/sl693/scripts/LOGen/"
+source(paste0(LOGEN_ROOT, "merge_characterise_dataset/run_ggtranscript.R"))
+source(paste0(SC_ROOT,"ipscABhinge_ont.config.R"))
+cpat <- fread("/lustre/projects/Research_Project-MRC148213/sl693/ipscABhinge/6_cpat/ipsc_target.ORF_prob.best.tsv")
+
+```
+
+## Summary
+
+Number of isoforms detected: `r nrow(class.files)`
+Number of genes detected: `r length(unique(class.files$associated_gene))`
+
+## Gene-specific {.tabset .tabset-fade}
+
+### UNC13A {.tabset .tabset-fade}
+
+#### Number of isoforms
+
+Shown below are the final detected number of isoforms (n = 17) associated with UNC13A after stringent filtering for artefacts. <br> 
+ISM - Incomplete Splice Match i.e. the query isoform has fewer 5' exons than the reference, but each internal junction agree. The exact 5' start and 3' end can differ by any amount.  
+NNC - Novel Not in Catalog i.e. the query isoform does not have a FSM or ISM match, and has at least one donor or acceptor site that is not annotated.
+
+```{r UNC13A}
+class.files %>% filter(associated_gene %in% c("UNC13A")) %>%
+  group_by(associated_gene, structural_category) %>% 
+  tally() %>% 
+  knitr::kable(.)
+
+```
+
+#### Tracks
+
+Shown below are the tracks of UNC13A-associated isoforms (hg19), and boxed in green is the area with the cryptic exon.  
+
+```{r track,warning=FALSE}
+
+Unc13AIso <- data.frame(
+  Isoform = unlist(Unc13AIso <- list(
+    Reference = unique(gtf$ref_target[gtf$ref_target$gene_name == "UNC13A" & !is.na(gtf$ref_target$transcript_id), "transcript_id"]),
+    ALS = as.character(as.character(class.files[which(class.files$associated_gene == "UNC13A" & class.files$Dataset == "als"),"isoform"])),
+    Control = as.character(as.character(class.files[which(class.files$associated_gene == "UNC13A" & class.files$Dataset == "control"),"isoform"])),
+    Both = as.character(as.character(class.files[which(class.files$associated_gene == "UNC13A" & class.files$Dataset == "Both"),"isoform"]))
+    )),
+  Category = rep(names(Unc13AIso), lengths(Unc13AIso))
+)
+Unc13AIso$colour <- c(rep(NA,length(Unc13AIso $Category[Unc13AIso $Category != "DTE"])))
+ggTranPlots(inputgtf=gtf$merged, classfiles=class.files,
+                     isoList = c(as.character(Unc13AIso$Isoform)),
+                     selfDf = Unc13AIso, gene="UNC13A") +
+  annotate("rect", xmin = 17752110, xmax = 17753839, ymin = -1, ymax = 11, alpha = 0.2, fill = "green")
+
+```
+
+#### Crytic exon 
+
+3 isoforms were detected to contain the cryptic exon. Each isoform was detected once in different ALS samples with 1 full-lengh ONT read.
+
+```{r pressure}
+class.files %>% filter(associated_gene %in% c("UNC13A")) %>% filter(isoform %in% c("PB.29829.137","PB.29829.133","PB.29829.126")) %>% 
+  select("isoform", contains("mapped")) %>% reshape2::melt(id="isoform", variable.name = "sample", value.name = "number_of_reads") %>% 
+  filter(number_of_reads > 0) %>% 
+  knitr::kable()
+```
+
+
+#### Coding potential 
+
+Below is the input from CPAT. TRUE = protein coding. FALSE = non-protein coding.
+
+```{r coding}
+
+# cpat protein coding potential
+cpat <- merge(class.files[,c("isoform","associated_gene")],cpat, by.x = "isoform", by.y = "V1", all.y = T)
+cpat <- cpat %>% mutate(proteinCodingPotential = ifelse(V9 < 0.364,FALSE,TRUE))
+cpat %>% filter(associated_gene == "UNC13A") %>% knitr::kable()
+```
